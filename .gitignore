@@ -1,0 +1,28 @@
+.DS_Store
+
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.log
+
+# Django artifacts
+*.sqlite3
+db.sqlite3
+staticfiles/
+
+# Virtual environments
+venv/
+env/
+mozio-env/
+project_venv/
+
+# Local environment variables
+.env
+.env.*
+!.env.example
+
+# Coverage reports
+.coverage
+htmlcov/
+
