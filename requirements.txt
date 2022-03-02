@@ -1,0 +1,12 @@
+distlib==0.3.4
+filelock==3.6.0
+GDAL==3.4.1
+numpy==1.22.2
+platformdirs==2.5.1
+protobuf==3.19.4
+six==1.16.0
+psycopg2-binary==2.9.3
+djangorestframework==3.13.1
+djangorestframework-gis==0.18
+django==3.2.12
+virtualenv==20.13.2
