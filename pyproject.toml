@@ -1,0 +1,31 @@
+# Tooling configuration. There is no build backend here: the project is a
+# Django application, not a distributable package.
+
+[tool.black]
+line-length = 90
+target-version = ["py310"]
+extend-exclude = "/(migrations|project_venv)/"
+
+[tool.ruff]
+line-length = 90
+target-version = "py310"
+extend-exclude = ["testapp/migrations", "project_venv"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "I",    # import sorting
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "DJ",   # Django-specific checks
+    "C4",   # comprehensions
+]
+ignore = [
+    "UP032",  # str % formatting is used consistently across this codebase
+    "UP031",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"testproject/settings.py" = ["E501"]
+"testapp/tests/*" = ["E501"]

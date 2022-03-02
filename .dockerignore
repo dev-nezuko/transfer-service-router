@@ -1,0 +1,17 @@
+.git
+.gitignore
+.github
+project_venv/
+venv/
+env/
+**/__pycache__/
+**/*.py[cod]
+*.log
+.env
+.env.*
+!.env.example
+.coverage
+htmlcov/
+staticfiles/
+docs/
+README.md

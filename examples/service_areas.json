@@ -1,0 +1,20 @@
+[
+  {
+    "provider_email": "ops@auroratransfers.example",
+    "name": "Lisbon Riverside",
+    "price": "27.50",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [[[-9.17, 38.69], [-9.17, 38.72], [-9.09, 38.72], [-9.09, 38.69], [-9.17, 38.69]]]
+    }
+  },
+  {
+    "provider_email": "ops@lisboaprime.example",
+    "name": "Sintra Hills",
+    "price": "64.00",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [[[-9.44, 38.76], [-9.44, 38.83], [-9.33, 38.83], [-9.33, 38.76], [-9.44, 38.76]]]
+    }
+  }
+]

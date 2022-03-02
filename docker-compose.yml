@@ -1,0 +1,49 @@
+# One command brings up PostGIS and the API with demo polygons already loaded:
+#   docker compose up --build
+# then: curl 'http://localhost:8300/testapp/search_service_area/?lat=38.7369&lng=-9.1399'
+
+services:
+  db:
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_DB: mozio
+      POSTGRES_USER: mozio
+      POSTGRES_PASSWORD: mozio
+    ports:
+      # Host 8301 so the database can be inspected without clashing with a
+      # local PostgreSQL on 5432.
+      - "8301:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mozio -d mozio"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DJANGO_SECRET_KEY: docker-compose-demo-key
+      DJANGO_DEBUG: "false"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,api"
+      POSTGRES_DB: mozio
+      POSTGRES_USER: mozio
+      POSTGRES_PASSWORD: mozio
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      # Flip to "true" to require an authenticated user for writes.
+      API_REQUIRE_AUTH: "false"
+      SEED_DEMO: "true"
+      DJANGO_SUPERUSER_USERNAME: admin
+      # Set in your shell to have an admin user created on boot; unset, none is.
+      DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-}
+      DJANGO_SUPERUSER_EMAIL: admin@example.com
+    ports:
+      - "8300:8000"
+
+volumes:
+  pgdata:

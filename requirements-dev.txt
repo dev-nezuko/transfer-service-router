@@ -1,0 +1,4 @@
+# Tooling that is not needed to run the service.
+-r requirements.txt
+ruff==0.6.9
+black==24.8.0
