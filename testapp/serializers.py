@@ -5,8 +5,6 @@ so the wire format is visible in the code and cannot drift when a column is
 added to a model.
 """
 
-import math
-
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from rest_framework_gis.fields import GeometryField
@@ -98,20 +96,6 @@ class PointSearchQuerySerializer(serializers.Serializer):
 
     lat = serializers.FloatField(min_value=-90.0, max_value=90.0)
     lng = serializers.FloatField(min_value=-180.0, max_value=180.0)
-
-    @staticmethod
-    def _require_finite(value):
-        # "nan" parses as a float and slips past min_value/max_value, because
-        # every comparison with NaN is false; PostGIS then matches nothing.
-        if not math.isfinite(value):
-            raise serializers.ValidationError("A finite number is required.")
-        return value
-
-    def validate_lat(self, value):
-        return self._require_finite(value)
-
-    def validate_lng(self, value):
-        return self._require_finite(value)
 
     def to_point(self):
         return point_from_lat_lng(self.validated_data["lat"], self.validated_data["lng"])

@@ -1,9 +1,7 @@
 """Shared fixtures for the test suite.
 
-Geometries are built from WKT through ``GEOSGeometry`` rather than the
-``Polygon`` constructor: Django 3.2 does not declare ctypes ``argtypes`` for
-``GEOSGeom_createPolygon``, which breaks that constructor against recent GEOS
-builds on arm64. The WKT reader is unaffected and is what the API itself uses.
+Geometries are built from WKT through ``GEOSGeometry``, the same reader the
+API and the management commands use, so the fixtures exercise that path.
 """
 
 from testapp.models import Provider

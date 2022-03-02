@@ -3,12 +3,12 @@
 
 [tool.black]
 line-length = 90
-target-version = ["py310"]
+target-version = ["py312"]
 extend-exclude = "/(migrations|project_venv)/"
 
 [tool.ruff]
 line-length = 90
-target-version = "py310"
+target-version = "py312"
 extend-exclude = ["testapp/migrations", "project_venv"]
 
 [tool.ruff.lint]
