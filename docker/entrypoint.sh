@@ -3,7 +3,7 @@
 # container command. Every step is idempotent, so restarts are safe.
 set -e
 
-python - <<'PY'
+python3 - <<'PY'
 import os
 import socket
 import sys
@@ -25,17 +25,21 @@ sys.exit("timed out waiting for %s:%d" % (host, port))
 PY
 
 echo "applying migrations ..."
-python manage.py migrate --noinput
+python3 manage.py migrate --noinput
 
 if [ "${SEED_DEMO:-true}" = "true" ]; then
     echo "seeding demo data ..."
-    python manage.py seed_demo
+    python3 manage.py seed_demo
 fi
 
 if [ -n "${DJANGO_SUPERUSER_USERNAME:-}" ] && [ -n "${DJANGO_SUPERUSER_PASSWORD:-}" ]; then
     echo "ensuring superuser ${DJANGO_SUPERUSER_USERNAME} exists ..."
-    python manage.py createsuperuser --noinput --username "${DJANGO_SUPERUSER_USERNAME}" \
-        --email "${DJANGO_SUPERUSER_EMAIL:-admin@example.com}" 2>/dev/null || true
+    # Only skip creation when the user already exists; any other failure (a bad
+    # email or a database error) should stop the container rather than vanish.
+    if python3 manage.py shell --no-imports -c "import sys; from django.contrib.auth import get_user_model; sys.exit(get_user_model().objects.filter(username='${DJANGO_SUPERUSER_USERNAME}').exists())"; then
+        python3 manage.py createsuperuser --noinput --username "${DJANGO_SUPERUSER_USERNAME}" \
+            --email "${DJANGO_SUPERUSER_EMAIL:-admin@example.com}"
+    fi
 fi
 
 exec "$@"

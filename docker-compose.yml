@@ -5,6 +5,9 @@
 services:
   db:
     image: postgis/postgis:17-3.5
+    # The PostGIS project publishes amd64 images only; on Apple Silicon this
+    # runs under emulation, which is fine for a demo database.
+    platform: linux/amd64
     environment:
       POSTGRES_DB: mozio
       POSTGRES_USER: mozio
@@ -35,8 +38,8 @@ services:
       POSTGRES_PASSWORD: mozio
       POSTGRES_HOST: db
       POSTGRES_PORT: "5432"
-      # Flip to "true" to require an authenticated user for writes.
-      API_REQUIRE_AUTH: "false"
+      # API_REQUIRE_AUTH=true docker compose up requires a user for writes.
+      API_REQUIRE_AUTH: ${API_REQUIRE_AUTH:-false}
       SEED_DEMO: "true"
       DJANGO_SUPERUSER_USERNAME: admin
       # Set in your shell to have an admin user created on boot; unset, none is.
