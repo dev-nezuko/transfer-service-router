@@ -35,8 +35,8 @@ class ServiceAreaViewSet(viewsets.ModelViewSet):
 class ServiceAreaSearchView(generics.ListAPIView):
     """``GET /testapp/search_service_area/?lat=&lng=``.
 
-    Returns every service area whose polygon contains the given point, newest
-    pagination rules applied. Validation failures are reported as
+    Returns every service area whose polygon contains the given point, paged
+    like the other list endpoints. Validation failures are reported as
     ``{"message": "..."}`` with ``400`` so that a client sees one readable
     string rather than a nested error object.
     """

@@ -8,6 +8,8 @@ up by name. Supporting a new source is one function plus one decorator, and the
 normalisation rules (SRID, geometry type, validity) stay in a single place.
 """
 
+import json
+
 from django.contrib.gis.gdal.error import GDALException
 from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.gis.geos.error import GEOSException
@@ -82,8 +84,6 @@ def _parse(raw):
 def read_geojson(raw):
     """Read a GeoJSON geometry, given either as a string or as a dict."""
     if isinstance(raw, dict | list):
-        import json
-
         raw = json.dumps(raw)
     return _parse(raw)
 
