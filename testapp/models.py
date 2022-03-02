@@ -1,7 +1,9 @@
 """Domain models: transfer providers and the priced polygons they serve."""
 
+from decimal import Decimal
+
 from django.contrib.gis.db import models as gis_models
-from django.core.validators import RegexValidator
+from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
 
 phone_regex = RegexValidator(
@@ -44,7 +46,9 @@ class ServiceArea(models.Model):
     """
 
     name = models.CharField(max_length=60)
-    price = models.DecimalField(max_digits=6, decimal_places=2)
+    price = models.DecimalField(
+        max_digits=6, decimal_places=2, validators=[MinValueValidator(Decimal("0"))]
+    )
     area_polygon = gis_models.PolygonField(blank=True, null=True)
     provider = models.ForeignKey(
         Provider,

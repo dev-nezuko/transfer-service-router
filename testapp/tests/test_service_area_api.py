@@ -70,6 +70,22 @@ class ServiceAreaAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("price", response.data)
 
+    def test_create_service_area_rejects_negative_price(self):
+        payload = {"name": "Downtown", "price": "-5.00", "provider": self.provider.id}
+
+        response = self.client.post(self.service_area_url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("price", response.data)
+        self.assertEqual(ServiceArea.objects.count(), 0)
+
+    def test_create_service_area_accepts_a_free_area(self):
+        payload = {"name": "Shuttle Loop", "price": "0.00", "provider": self.provider.id}
+
+        response = self.client.post(self.service_area_url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
     def test_create_service_area_rejects_price_above_field_precision(self):
         """max_digits=6 / decimal_places=2 caps the price at 9999.99."""
         payload = {
