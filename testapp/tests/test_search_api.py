@@ -161,6 +161,14 @@ class SearchServiceAreaAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("lng", response.data["message"])
 
+    def test_rejects_nan_coordinates(self):
+        for params in ({"lat": "nan", "lng": "5.0"}, {"lat": "5.0", "lng": "NaN"}):
+            with self.subTest(params=params):
+                response = self.client.get(self.search_url, params)
+
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn("finite", response.data["message"])
+
     def test_only_get_is_allowed(self):
         response = self.client.post(self.search_url, {"lat": "5.0", "lng": "5.0"})
 
