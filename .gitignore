@@ -13,6 +13,7 @@ db.sqlite3
 staticfiles/
 
 # Virtual environments
+.venv/
 venv/
 env/
 mozio-env/

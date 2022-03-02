@@ -1,15 +1,15 @@
-# Mozio take-home: service areas, searched by coordinate
+# Service-area pricing, searched by coordinate
 
 Transfer **providers** own priced **service areas** — polygons on a map. Given a
 latitude and longitude, this service answers *which areas cover this point, and
 at what price?* with one PostGIS query against a GiST-indexed polygon column.
 
-Two models, three endpoints, 82 tests. The interesting part is that one query, so
+Two models, three endpoints, 85 tests, on Django 5.2 LTS and Python 3.12. The interesting part is that one query, so
 most of this README is about it: where it lives, how it is indexed, what it costs.
 
 ## The one query
 
-`GET /testapp/search_service_area/?lat=&lng=` is the assessment. It lives in
+`GET /testapp/search_service_area/?lat=&lng=` is the product. It lives in
 [`testapp/queries.py`](testapp/queries.py) as a named object, not a line in a
 viewset, because it has three quiet ways to be wrong: a **SRID mismatch** (so
 `for_point` refuses anything but 4326 rather than letting psycopg2 report it),
@@ -80,7 +80,7 @@ spends 0.028 ms. The rest is Python, psycopg2 and GEOS deserialising the polygon
 being *returned*: every result carries its full `area_polygon`, so **response size
 is the real ceiling**. The fix is a serializer that drops geometry from list
 responses, deliberately not applied here because the polygon is part of the
-response shape the assessment documents.
+documented response shape.
 
 The 570x is not a constant, either: a re-run tabulated in
 [`docs/scalability.md`](docs/scalability.md) gave 0.018 ms against 20.3 ms, nearer
@@ -124,28 +124,63 @@ with `?page_size=` honoured up to `API_MAX_PAGE_SIZE`.
 | `/testapp/service_area/` and `/testapp/service_area/<id>/` | full CRUD |
 | `/testapp/search_service_area/?lat=&lng=` | `GET` only |
 
-Search requires `lat` in `[-90, 90]` and `lng` in `[-180, 180]`; bad input is
+Search requires finite `lat` in `[-90, 90]` and `lng` in `[-180, 180]` (`nan`
+is refused, not silently matched against nothing); bad input is
 `400 {"message": "..."}` and anything but `GET` is `405`. A point exactly on a
 polygon edge is **not** contained — `ST_Contains`, not `ST_Intersects` (see
 below). Polygons arrive as GeoJSON, and a self-intersecting ring is rejected with
 `400 {"area_polygon": ["invalid polygon: Self-intersection[5 5]"]}` before it
-reaches the table, because `ST_Contains` against one is undefined.
+reaches the table, because `ST_Contains` against one is undefined. Prices are
+`Decimal` with two places, from `0.00` to `9999.99`; a negative price is a `400`.
 
 There is no UI beyond the Django admin and DRF's browsable API, so in place of
-screenshots there is a full unedited `curl` transcript against a live server in
+screenshots there is a `curl` transcript against the running compose stack in
 [`docs/api-session.md`](docs/api-session.md): overlapping hits, empty results,
 validation failures, pagination, writes, uniqueness rejections, the auth switch.
 
 ## Running it
 
-You need PostgreSQL with PostGIS plus the GEOS and GDAL shared libraries
-GeoDjango loads through `ctypes` — both ship with Postgres.app and most PostGIS
-packages. If autodetection fails, set `GEOS_LIBRARY_PATH` / `GDAL_LIBRARY_PATH`.
+### With Docker Compose
 
 ```sh
-python3.10 -m venv project_venv && source project_venv/bin/activate
-pip install -r requirements.txt          # Django 3.2 does not support 3.11+
-createdb mozio && psql -d mozio -c 'CREATE EXTENSION IF NOT EXISTS postgis;'
+DJANGO_SUPERUSER_PASSWORD=pick-one docker compose up --build
+curl 'http://localhost:8300/testapp/search_service_area/?lat=38.7369&lng=-9.1399'
+```
+
+That builds the API image, starts PostGIS, and runs an idempotent entrypoint:
+wait for the database, migrate, load the demo data (`SEED_DEMO`), and create the
+`admin` superuser if `DJANGO_SUPERUSER_PASSWORD` is set and the user is missing.
+The API is on host port 8300 and PostGIS on 8301, so a local PostgreSQL on 5432
+is left alone. `API_REQUIRE_AUTH=true docker compose up` turns on the write
+switch described below. `docker compose down -v` throws the data away.
+
+```mermaid
+flowchart LR
+    client["curl / browser"] -- ":8300" --> api
+    subgraph compose
+        api["api: gunicorn, 3 workers<br/>Django 5.2 + DRF"] -- "psycopg2" --> db[("db: PostGIS 3.5<br/>PostgreSQL 17")]
+    end
+    host["psql"] -- ":8301" --> db
+```
+
+The image is two stages. `python:3.12-slim` resolves the requirements into a
+plain directory; the runtime stage is `ghcr.io/osgeo/gdal:ubuntu-small-3.12.0`,
+which already carries the GDAL, GEOS and PROJ shared libraries GeoDjango loads
+through `ctypes`, for both amd64 and arm64, so nothing is compiled or
+apt-installed. It runs as a non-root user and has a healthcheck. The
+`postgis/postgis` image is published for amd64 only, so the compose file pins
+that platform; on Apple Silicon the database runs under emulation.
+
+### Without Docker
+
+You need Python 3.12 (`.python-version`), PostgreSQL with PostGIS, and the GEOS
+and GDAL shared libraries — Postgres.app and most PostGIS packages ship them. If
+autodetection fails, set `GEOS_LIBRARY_PATH` / `GDAL_LIBRARY_PATH`.
+
+```sh
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+createdb areas && psql -d areas -c 'CREATE EXTENSION IF NOT EXISTS postgis;'
 cp .env.example .env                     # then edit POSTGRES_* to match
 python manage.py migrate
 python manage.py seed_demo               # 4 providers, 8 areas in Lisbon/Berlin/NYC
@@ -154,17 +189,6 @@ python manage.py runserver
 
 Three seeded Lisbon polygons overlap on purpose, so `?lat=38.7369&lng=-9.1399`
 returns two providers at two different prices, 24.50 and 58.75.
-
-### Docker, and its honest status
-
-`docker-compose.yml` brings up PostGIS and the API on host ports 8300 and 8301,
-with a multi-stage build, non-root runtime user, healthcheck, and an idempotent
-entrypoint that waits for the database, migrates, seeds and creates a superuser. It
-has **not been run.** The only Docker command executed here was
-`docker compose config -q`, which exited 0 — a parse check, nothing more. Build
-and boot are both recorded as *NOT RUN — deferred, RAM constraint*, and the
-Dockerfile pins Debian bookworm package names (`libgdal32`, `libgeos-c1v5`,
-`libproj25`) never resolved against a real build. Treat it as unverified.
 
 ## Settings
 
@@ -183,7 +207,8 @@ time, and real variables win over it. Full list in
 ## Tests and tooling
 
 ```sh
-python manage.py test                              # 82 tests
+python manage.py test                              # 85 tests
+docker compose exec api python3 manage.py test     # the same, inside the stack
 python manage.py test testapp.tests.test_queries   # one layer
 ruff check . && black --check .                    # needs requirements-dev.txt
 python manage.py import_service_areas examples/service_areas.json --dry-run
@@ -215,10 +240,9 @@ enforcing polygon-ness, validity and SRID 4326 on every path into the database,
 and `import_service_areas --format` takes its `choices` from the registry. It is
 the only seam because it is the only place with two callers already.
 
-**Every endpoint is open by default, including `DELETE`.** That is the
-assessment's documented surface, and silently requiring credentials would change
-the thing being assessed — so the default stays open, and the decision became a
-switch rather than a sentence. DRF's default permission class is
+**Every endpoint is open by default, including `DELETE`.** That is the API's
+documented surface, and silently requiring credentials would change it — so the
+default stays open, and the decision became a switch rather than a sentence. DRF's default permission class is
 `testapp.permissions.WriteRequiresAuth`, which reads `settings.API_REQUIRE_AUTH`
 *per request*: off, behaviour is identical to before; on, reads stay anonymous and
 every write needs an authenticated user. Session and basic auth are configured, so
@@ -231,8 +255,9 @@ captured live — read `200`, anonymous `DELETE` `403`, authenticated `DELETE` `
 - **Unauthenticated by default.** The switch exists; the default is open, on
   purpose. A real deployment sets `API_REQUIRE_AUTH=true` and adds a token backend
   to `DEFAULT_AUTHENTICATION_CLASSES`.
-- **The container image has never been built or booted here** — only
-  `docker compose config -q` was run.
+- **PostGIS runs emulated on Apple Silicon**, because the upstream image is
+  amd64-only. Fine for the demo; the benchmark figures above came from a native
+  Postgres.app install, not from the container.
 - **The search returns full polygons**, which is the real scaling ceiling rather
   than the query. Left alone to preserve the documented response shape.
 - **TLS settings are unset.** `manage.py check --deploy` flags
@@ -240,11 +265,10 @@ captured live — read `200`, anonymous `DELETE` `403`, authenticated `DELETE` `
   enabling the redirect would break the plain-HTTP compose demo, so the gap is
   documented rather than half-fixed. `SECURE_CONTENT_TYPE_NOSNIFF` and
   `X_FRAME_OPTIONS = DENY` are set. No rate limiting or caching either.
-- **Django 3.2 was deliberately not upgraded**, being the framework the assessment
-  was written against, but it is past end of life (April 2024), caps the
-  interpreter at Python 3.10, and omits ctypes `argtypes` on
-  `GEOSGeom_createPolygon`, so the `Polygon(...)` constructor can fail against
-  recent GEOS builds on arm64. The app, fixtures and tests all build geometry
-  through `GEOSGeometry` from WKT or GeoJSON, which works regardless.
-- **No AI features and no new product functionality** were added: the work went
-  into the query, the tests and the measurement instead.
+- **No new product functionality** beyond the search, the CRUD endpoints and
+  the two management commands; the work went into the query, the tests and the
+  measurement.
+
+## License
+
+MIT, see [`LICENSE`](LICENSE).
